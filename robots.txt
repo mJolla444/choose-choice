@@ -1,0 +1,3 @@
+User-agent: *
+Allow: /
+Sitemap: https://mjolla444.github.io/choose-choice/sitemap.xml
