@@ -1,0 +1,31 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="utf-8"><meta name="robots" content="noindex,nofollow"><title>Admin – cHooSe cHoIce</title><meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover"><link rel="icon" href="icon.svg"><link rel="stylesheet" href="style.css">
+<style>.tabs button{margin-right:6px}.rec{background:var(--card);border:1px solid var(--bd);border-radius:12px;padding:12px 14px;margin:10px 0}.rec h3{margin:0 0 4px}.rec p{margin:4px 0;white-space:pre-wrap;word-break:break-word}.rec .row{margin-top:8px}.btn.bad{background:#b91c1c}.k{color:var(--mut);font-size:13px}</style></head>
+<body><header><div class="w"><nav><a class="logo" href="index.html">c<b>H</b>oo<b>S</b>e c<b>H</b>o<b>I</b>ce · Admin</a><button class="btn s" id="out" style="display:none">Sign out</button></nav></div></header>
+<main class="w" style="min-height:60vh;padding-top:20px">
+<div id="login"><h1>Admin</h1><p class="m">Only the site owner can open this area.</p><button class="btn" id="in">Sign in with Google</button><p id="msg" class="m"></p></div>
+<div id="panel" style="display:none"><div class="tabs" id="tabs"></div><p class="m" id="st"></p><div id="list"></div></div>
+</main>
+<script type="module">
+import {initializeApp} from "https://www.gstatic.com/firebasejs/10.14.1/firebase-app.js";
+import {getAuth,GoogleAuthProvider,signInWithPopup,signOut,onAuthStateChanged} from "https://www.gstatic.com/firebasejs/10.14.1/firebase-auth.js";
+import {getFirestore,collection,getDocs,doc,updateDoc,deleteDoc} from "https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore.js";
+const app=initializeApp({apiKey:"AIzaSyD-1h4HVNYn2P4RywEmMqSC8Wg2ExjkRZ8",authDomain:"choose-choice-33524.firebaseapp.com",projectId:"choose-choice-33524",storageBucket:"choose-choice-33524.firebasestorage.app",messagingSenderId:"940315521482",appId:"1:940315521482:web:dfecd961f4c64c285f5f33"});
+const auth=getAuth(app),db=getFirestore(app);
+const $=s=>document.querySelector(s);
+const esc=s=>String(s==null?"":s).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const TABS=[["pending","Pending providers"],["approved","Approved providers"],["requests","Requests"],["messages","Messages"],["reports","Reports"]];
+let tab="pending",cache={};
+$("#in").onclick=async()=>{$("#msg").textContent="";try{await signInWithPopup(auth,new GoogleAuthProvider())}catch(e){$("#msg").textContent="Sign-in failed: "+(e.code||e.message)}};
+$("#out").onclick=()=>signOut(auth);
+onAuthStateChanged(auth,u=>{const on=!!u;$("#login").style.display=on?"none":"";$("#panel").style.display=on?"":"none";$("#out").style.display=on?"":"none";if(on){drawTabs();load()}});
+function drawTabs(){$("#tabs").innerHTML=TABS.map(t=>`<button class="btn ${t[0]==tab?"":"s"}" data-t="${t[0]}">${t[1]}${cache[t[0]]!=null?" ("+cache[t[0]].length+")":""}</button>`).join("");document.querySelectorAll("#tabs button").forEach(b=>b.onclick=()=>{tab=b.dataset.t;drawTabs();render()})}
+async function load(){$("#st").textContent="Loading…";try{const [p,r,m,x]=await Promise.all(["providers","requests","messages","reports"].map(c=>getDocs(collection(db,c))));const rows=s=>s.docs.map(d=>({id:d.id,...d.data()})).sort((a,b)=>(b.createdAt?.seconds||0)-(a.createdAt?.seconds||0));const P=rows(p);cache={pending:P.filter(v=>v.status!="approved"),approved:P.filter(v=>v.status=="approved"),requests:rows(r),messages:rows(m),reports:rows(x)};$("#st").textContent="";drawTabs();render()}catch(e){$("#st").textContent=e.code=="permission-denied"?"This Google account is not the admin account.":"Could not load: "+(e.code||e.message)}}
+const COL={pending:"providers",approved:"providers",requests:"requests",messages:"messages",reports:"reports"};
+function render(){const rows=cache[tab]||[];if(!rows.length){$("#list").innerHTML='<p class="m">Nothing here yet.</p>';return}
+$("#list").innerHTML=rows.map(r=>{const when=r.createdAt?.seconds?new Date(r.createdAt.seconds*1000).toLocaleString():"";const f=Object.entries(r).filter(([k])=>!["id","createdAt","status"].includes(k)&&r[k]!=="").map(([k,v])=>`<p><span class="k">${esc(k)}:</span> ${esc(v)}</p>`).join("");
+const btn=tab=="pending"?`<button class="btn" data-a="approve" data-id="${esc(r.id)}">Approve</button> <button class="btn bad" data-a="del" data-id="${esc(r.id)}">Reject / delete</button>`:tab=="approved"?`<button class="btn s" data-a="unpub" data-id="${esc(r.id)}">Unpublish</button> <button class="btn bad" data-a="del" data-id="${esc(r.id)}">Delete</button>`:`<button class="btn bad" data-a="del" data-id="${esc(r.id)}">Delete</button>`;
+return `<div class="rec"><span class="k">${esc(when)}</span>${f}<div class="row">${btn}</div></div>`}).join("");
+document.querySelectorAll("#list button").forEach(b=>b.onclick=()=>act(b.dataset.a,b.dataset.id))}
+async function act(a,id){const ref=doc(db,COL[tab],id);try{if(a=="approve")await updateDoc(ref,{status:"approved"});else if(a=="unpub")await updateDoc(ref,{status:"pending"});else{if(!confirm("Delete this permanently?"))return;await deleteDoc(ref)}await load()}catch(e){alert("Failed: "+(e.code||e.message))}}
+</script></body></html>
